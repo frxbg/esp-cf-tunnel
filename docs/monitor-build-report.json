@@ -1,0 +1,21 @@
+{
+  "date": "2026-09-22",
+  "builds": [
+    {
+      "profile": "yd_s3",
+      "version": "0.3.2",
+      "binary_bytes": 1046928,
+      "sha256": "500a73434732e705619407fb3cdc93e0bb068c6e53f2224d5a7f4962e866f7e7",
+      "hardware_tested": true,
+      "live_cloudflare_tested": true
+    },
+    {
+      "profile": "no_psram",
+      "version": "0.3.2",
+      "binary_bytes": 1036944,
+      "sha256": "2064ff814f81893c6bc27d9ad0777e9a321908175702534dc98e4699573419cd",
+      "hardware_tested": false,
+      "live_cloudflare_tested": false
+    }
+  ]
+}

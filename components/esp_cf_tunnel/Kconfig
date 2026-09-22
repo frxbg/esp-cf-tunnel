@@ -1,0 +1,28 @@
+menu "Cloudflare Tunnel experimental profiles"
+    config CF_TUNNEL_HTTP2
+        bool "Build the bounded upstream HTTP/2 server engine"
+        default n
+        help
+            Portable HTTP/2 engine. Does not start network or TLS connections.
+    config CF_TUNNEL_ESP_TRANSPORT
+        bool "Build the experimental ESP-TLS named tunnel connector"
+        select CF_TUNNEL_HTTP2
+        default n
+        help
+            IPv4 DNS discovery, TLS client, HTTP/2 server, registration and
+            configuration. Application owns network/time and native backend.
+    config CF_TUNNEL_APPLICATION_STREAMS
+        int "Example application stream slots (2 or 4)"
+        range 2 4
+        default 4
+        help
+            Example input to esp_cf_tunnel_init. Select 2 or 4; the API rejects
+            3. Does not include the separate control/config stream slots.
+    config CF_TUNNEL_BODY_CHUNK
+        int "Application chunk bytes (current transport bound)"
+        range 2048 2048
+        default 2048
+        help
+            Fixed at CF_H2_CHUNK for this port. This is not a TLS record or
+            HTTP/2 frame limit; legal 16 KiB frames are consumed in chunks.
+endmenu

@@ -1,0 +1,45 @@
+esp_cf_tunnel third-party notices
+
+Project source is MIT licensed; third-party files retain their original terms.
+
+cJSON 1.7.19
+Repository: https://github.com/DaveGamble/cJSON
+Commit: c859b25da02955fef659d658b8f324b5cde87be3
+Copyright (c) 2009-2017 Dave Gamble and cJSON contributors
+License: MIT; components/esp_cf_tunnel/third_party/cjson/LICENSE.
+Vendored source/header identifiers are prefixed cf_cJSON to avoid collisions.
+CJSON_NESTING_LIMIT=16 is a build definition. Allocation/validation wrappers
+are project code; original notices are preserved.
+
+nghttp2 1.70.0
+Repository: https://github.com/nghttp2/nghttp2
+Commit: 85e300c79fb6dbcfa9c1013215c8710c1c2cd3d2
+License: MIT; components/esp_cf_tunnel/third_party/nghttp2/COPYING.
+The minimal library is vendored and linked. A debug printf portability fix uses
+PRId32 in nghttp2_map.c. See third_party/nghttp2/README.esp_cf_tunnel.md.
+The bundled sfparse source retains its upstream MIT notice.
+
+cloudflared 2026.9.1 / public Cloudflare edge roots
+Repository: https://github.com/cloudflare/cloudflared
+Commit: f11dea9cb7079e90a982c1a2d5548ab40847fdcf
+License: Apache-2.0; components/esp_cf_tunnel/certs/LICENSE-cloudflared.
+The three public edge CA certificates are redistributed in
+components/esp_cf_tunnel/certs/cloudflare_edge_roots.pem, extracted from the
+pinned reference's tlsconfig/cloudflare_ca.go. They are public trust anchors,
+not private keys. No Go runtime or cloudflared executable is linked into firmware.
+
+ESP-IDF v6.1
+Repository: https://github.com/espressif/esp-idf
+Commit: fff9895c82d744c7237be8847347bdd1b07c6643
+The SDK is not vendored; SDK components retain their own licenses.
+The monitor additionally downloads espressif/led_strip 3.0.3 (Apache-2.0).
+
+Host-only RPC oracle
+Uses the unchanged generated Cloudflare schema from a separately fetched
+reference and zombiezen.com/go/capnproto2 v2.18.0+incompatible (MIT).
+Transitive Go dependencies retain their upstream licenses. They are not
+vendored into the component or firmware. See tools/rpc_reference/go.mod.
+
+README structure
+Adapted from https://github.com/othneildrew/Best-README-Template (Unlicense).
+Project-specific prose, diagrams and branding are original to this repository.

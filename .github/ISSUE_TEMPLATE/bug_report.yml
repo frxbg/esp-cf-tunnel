@@ -1,0 +1,30 @@
+name: Bug report
+description: Report a reproducible library or example problem
+body:
+  - type: markdown
+    attributes:
+      value: Do not include tokens, passwords, NVS dumps, private hostnames or raw authenticated headers. Report vulnerabilities privately through SECURITY.md.
+  - type: input
+    id: version
+    attributes:
+      label: Library version / commit and ESP-IDF version
+    validations:
+      required: true
+  - type: input
+    id: hardware
+    attributes:
+      label: Chip, board and RAM/flash configuration
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps, expected result and actual result
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Sanitized diagnostics
+      description: Include state, error codes and memory figures. Remove credentials and identifying network data.
+      render: text

@@ -1,0 +1,38 @@
+{
+  "verified_on": "2026-09-22",
+  "esp-idf": {
+    "repository": "https://github.com/espressif/esp-idf",
+    "tag": "v6.1",
+    "commit": "fff9895c82d744c7237be8847347bdd1b07c6643"
+  },
+  "cloudflared-reference": {
+    "repository": "https://github.com/cloudflare/cloudflared",
+    "tag": "2026.9.1",
+    "commit": "f11dea9cb7079e90a982c1a2d5548ab40847fdcf"
+  },
+  "led-strip-monitor": {
+    "registry": "https://components.espressif.com/components/espressif/led_strip/versions/3.0.3",
+    "version": "3.0.3",
+    "component_hash": "28621486f77229aaf81c71f5e15d6fbf36c2949cf11094e07090593e659e7639",
+    "scope": "system_monitor example only; Apache-2.0"
+  },
+  "cJSON": {
+    "repository": "https://github.com/DaveGamble/cJSON",
+    "tag": "v1.7.19",
+    "commit": "c859b25da02955fef659d658b8f324b5cde87be3",
+    "modification": "cJSON identifier prefix renamed to cf_cJSON to avoid application symbol collisions"
+  },
+  "nghttp2": {
+    "repository": "https://github.com/nghttp2/nghttp2",
+    "tag": "v1.70.0",
+    "commit": "85e300c79fb6dbcfa9c1013215c8710c1c2cd3d2",
+    "status": "Vendored library linked by CF_TUNNEL_HTTP2; host, sanitizer, S3/P4 builds passed",
+    "modification": "Debug int32_t printf uses PRId32 in nghttp2_map.c; see vendored README"
+  },
+  "capnp-rpc-host-oracle": {
+    "module": "zombiezen.com/go/capnproto2",
+    "version": "v2.18.0+incompatible",
+    "sum": "h1:mwfXZniffG5mXokQGHUJWGnqIBggoPfT/CEwon9Yess=",
+    "scope": "Host tests only; unchanged cloudflared generated schema, Go 1.26.8 used"
+  }
+}

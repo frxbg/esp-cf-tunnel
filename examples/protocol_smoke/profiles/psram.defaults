@@ -1,0 +1,3 @@
+# Compile experiment. PSRAM mode/pins must match the actual board before use.
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_USE_CAPS_ALLOC=y

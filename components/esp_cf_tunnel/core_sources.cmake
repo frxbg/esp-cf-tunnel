@@ -1,0 +1,12 @@
+set(CF_CORE_SOURCES
+    src/protocol/cf_base64.c
+    src/protocol/cf_headers.c
+    src/protocol/cf_capnp_framing.c
+    src/protocol/cf_capnp.c
+    src/protocol/cf_rpc.c
+    src/protocol/cf_dns.c
+    src/protocol/cf_json.c
+    src/protocol/cf_credentials.c
+    src/protocol/cf_config.c
+    src/cf_lifecycle.c
+)

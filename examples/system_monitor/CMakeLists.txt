@@ -1,0 +1,7 @@
+cmake_minimum_required(VERSION 3.20)
+set(EXTRA_COMPONENT_DIRS "${CMAKE_CURRENT_LIST_DIR}/../../components")
+set(COMPONENTS main)
+set(PROJECT_VER "0.3.2")
+include($ENV{IDF_PATH}/tools/cmake/project.cmake)
+idf_build_set_property(DEPENDENCIES_LOCK "${CMAKE_BINARY_DIR}/dependencies.lock")
+project(esp_system_monitor)

@@ -1,0 +1,5 @@
+# Name, Type, SubType, Offset, Size, Flags
+factory, app, factory, 0x10000, 0x180000,
+nvs, data, nvs, 0x200000, 0x6000,
+monitor_cfg, data, nvs, 0x206000, 0x6000,
+phy_init, data, phy, 0x20c000, 0x1000,

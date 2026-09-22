@@ -1,0 +1,22 @@
+version: "0.3.2"
+description: "Experimental native Cloudflare Tunnel connector for ESP-IDF: TLS, HTTP/2 and a bounded native HTTP backend."
+license: "MIT"
+url: "https://github.com/frxbg/esp-cf-tunnel"
+repository: "https://github.com/frxbg/esp-cf-tunnel.git"
+repository_info:
+  path: "components/esp_cf_tunnel"
+documentation: "https://github.com/frxbg/esp-cf-tunnel/blob/main/docs/integration.md"
+issues: "https://github.com/frxbg/esp-cf-tunnel/issues"
+maintainers:
+  - "frxbg"
+targets:
+  - esp32s3
+  - esp32p4
+tags:
+  - networking
+  - http
+  - tunnel
+files:
+  use_gitignore: true
+dependencies:
+  idf: "==6.1.0"

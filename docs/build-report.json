@@ -1,0 +1,49 @@
+{
+  "scope": "protocol_smoke with transport linked; no live network or runtime memory baseline",
+  "builds": [
+    {
+      "build": "build-idf-esp32p4-no_psram",
+      "target": "esp32p4",
+      "idf_version": "v6.1",
+      "binary_bytes": 573120,
+      "sha256": "86f0a991509d57cd76ff2e8aa9a0a3f0850301a0f05f1dcbc42b5145e93bf40c",
+      "psram_enabled": false,
+      "transport_enabled": true,
+      "hardware_tested": false,
+      "live_cloudflare_tested": false
+    },
+    {
+      "build": "build-idf-esp32p4-psram",
+      "target": "esp32p4",
+      "idf_version": "v6.1",
+      "binary_bytes": 586144,
+      "sha256": "30d9bd5f1f9787877c7cc5423d40b22891c3c52a75b6cda5b97e9d99493ed3c2",
+      "psram_enabled": true,
+      "transport_enabled": true,
+      "hardware_tested": false,
+      "live_cloudflare_tested": false
+    },
+    {
+      "build": "build-idf-esp32s3-no_psram",
+      "target": "esp32s3",
+      "idf_version": "v6.1",
+      "binary_bytes": 498512,
+      "sha256": "4bac5827d91f5a8d410ce00377fd6b68f7430f0a147524702606d2fa68b4f504",
+      "psram_enabled": false,
+      "transport_enabled": true,
+      "hardware_tested": false,
+      "live_cloudflare_tested": false
+    },
+    {
+      "build": "build-idf-esp32s3-psram",
+      "target": "esp32s3",
+      "idf_version": "v6.1",
+      "binary_bytes": 504880,
+      "sha256": "3a5bc8de2f351ab5abd2e967a23118631d9954473db51d2c68f83bade05945c9",
+      "psram_enabled": true,
+      "transport_enabled": true,
+      "hardware_tested": false,
+      "live_cloudflare_tested": false
+    }
+  ]
+}

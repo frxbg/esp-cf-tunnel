@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 88 88" role="img" aria-label="ESP Cloudflare Tunnel">
+  <rect width="88" height="88" rx="20" fill="#eff8fa"/>
+  <g fill="none" stroke="#087e8b" stroke-width="3" stroke-linecap="round">
+    <rect x="17" y="30" width="33" height="33" rx="6"/>
+    <path d="M24 24v6m10-6v6m10-6v6M24 63v6m10-6v6m10-6v6M11 37h6m-6 10h6m-6 10h6M50 47h10m-10 10h6"/>
+  </g>
+  <path d="M49 37h18a9 9 0 0 0 0-18 12 12 0 0 0-23 4 7 7 0 0 0 5 14Z" fill="#f79838" stroke="#eff8fa" stroke-width="3"/>
+</svg>

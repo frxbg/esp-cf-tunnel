@@ -1,0 +1,2 @@
+# Experimental transport budget input. No transport is linked yet.
+CONFIG_CF_TUNNEL_APPLICATION_STREAMS=2

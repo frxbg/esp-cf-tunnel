@@ -1,0 +1,13 @@
+name: Feature request
+description: Propose a focused addition
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Use case and proposed behavior
+    validations:
+      required: true
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Hardware, memory and compatibility constraints

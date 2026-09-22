@@ -1,0 +1,2 @@
+# Safe compile profile; no external RAM assumption.
+CONFIG_SPIRAM=n
