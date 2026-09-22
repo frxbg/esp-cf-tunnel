@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(esp_cf_tunnel_host VERSION 0.1.0 LANGUAGES C)
+project(esp_cf_tunnel_host VERSION 0.3.2 LANGUAGES C)
 include(CTest)
 option(CF_SANITIZERS "Enable AddressSanitizer and UndefinedBehaviorSanitizer (Clang/GCC)" OFF)
 option(CF_FUZZING "Build libFuzzer parser harness (Clang)" OFF)

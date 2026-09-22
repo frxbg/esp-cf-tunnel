@@ -53,6 +53,12 @@ also builds from a clean source-only export. These are compile checks, not new
 hardware runs. The component ZIP is generated from canonical Git index bytes,
 includes its dependency licenses and public CA roots, and ships with SHA256SUMS.
 
+An independent S3 project also resolved the component directly from the public
+GitHub repository and built successfully. The initial public CI run passed all
+eight jobs: history scanning, Clang ASan/UBSan with a timed parser fuzz run,
+four S3/P4 memory profiles and both monitor profiles. Current results are visible
+in [GitHub Actions](https://github.com/frxbg/esp-cf-tunnel/actions/workflows/ci.yml).
+
 ## Reproduce
 
 See [CONTRIBUTING.md](../CONTRIBUTING.md) for commands and

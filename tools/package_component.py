@@ -28,9 +28,10 @@ def main():
             if not name.startswith(prefix):
                 continue
             entry = zipfile.ZipInfo('esp_cf_tunnel/' + name[len(prefix):], (2026, 1, 1, 0, 0, 0))
+            entry.create_system = 3
             entry.compress_type = zipfile.ZIP_DEFLATED
             entry.external_attr = 0o100644 << 16
-            out.writestr(entry, data)
+            out.writestr(entry, data, compresslevel=9)
             count += 1
     digest = hashlib.sha256(archive.read_bytes()).hexdigest()
     checksum = destination / 'SHA256SUMS'
