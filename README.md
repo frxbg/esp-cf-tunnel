@@ -135,7 +135,8 @@ For a working application, start with [System Monitor](examples/system_monitor/R
 git clone https://github.com/frxbg/esp-cf-tunnel.git
 cd esp-cf-tunnel
 # Activate ESP-IDF v6.1 first.
-python tools/build_monitor.py --profile yd_s3
+python tools/prepare_idf_tls.py --output .cache/idf-v6.1-tls/esp-tls
+python tools/build_monitor.py --profile yd_s3 --tls-override .cache/idf-v6.1-tls/esp-tls
 ```
 
 The example targets the YD-ESP32-23 with 16 MiB flash and optional 8 MiB PSRAM.

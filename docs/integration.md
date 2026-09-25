@@ -24,6 +24,18 @@ Wi-Fi, Ethernet, esp_netif, event loops, SNTP or NVS. P4 applications must suppl
 their own working network interface. The monitor's Wi-Fi/GPIO code is a separate
 S3 example, not part of the library.
 
+The native mbedTLS transport now enables TLS 1.3 (certificate and hostname
+verification remain mandatory). The tested edge rejected TLS 1.2 with alert 70.
+For the pinned IDF v6.1, explicitly prepare the [guarded TCP poll override](../patches/esp-idf-v6.1/README.md)
+and add its component directory to `EXTRA_COMPONENT_DIRS` before IDF project
+initialization. This SDK fix is separate from the component package.
+
+Retained `last_connect` and `last_connect_failure` snapshots distinguish TCP,
+TLS setup/handshake and application deadline. Numeric ESP/TLS/verification/system
+errors are captured before teardown. `errno_context` can be stale even on success;
+`utc_s` is wall time, while elapsed/deadline use monotonic time. See the
+[measured diagnosis](tcp-tls-diagnostics.md).
+
 ## Application contract
 
 `esp_cf_tunnel_config` is defined in

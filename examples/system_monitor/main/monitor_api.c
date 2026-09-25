@@ -1,6 +1,8 @@
 #include "monitor.h"
 #include "cf_json.h"
 #include "monitor_api.h"
+#include "monitor_ota.h"
+#include "mbedtls/base64.h"
 #include "esp_timer.h"
 #include "esp_random.h"
 #include "esp_heap_caps.h"
@@ -78,6 +80,20 @@ static esp_err_t send_json(api_context *r, cf_cJSON *j)
     r->reply->status=200; r->reply->length=strlen(r->reply->body); return ESP_OK;
 }
 
+static void connect_status(cf_cJSON *parent, const char *key, const esp_cf_connect_diagnostic *d)
+{
+    cf_cJSON *j = cf_cJSON_AddObjectToObject(parent,key);
+    if (!j) { json_ok = false; return; }
+    b(j,"valid",d->valid); if (!d->valid) return;
+    s(j,"stage",esp_cf_connect_stage_name(d->stage)); b(j,"errors_available",d->errors_available);
+    n(j,"rc",d->rc); n(j,"state_before",d->state_before); n(j,"state_after",d->state_after);
+    n(j,"esp_error",d->esp_error); n(j,"tls_error",d->tls_error); n(j,"verify_flags",d->verify_flags);
+    n(j,"system_error",d->system_error); n(j,"errno_context",d->errno_context);
+    n(j,"tls_alert",d->tls_alert); n(j,"tls_version",d->tls_version);
+    n(j,"elapsed_ms",d->elapsed_ms); n(j,"at_ms",d->at_ms); n(j,"utc_s",d->utc_s);
+    n(j,"attempt",d->attempt); s(j,"edge_ip",d->edge_ip); n(j,"edge_port",d->edge_port);
+    n(j,"heap_free",d->heap_free); n(j,"heap_largest",d->heap_largest);
+}
 static cf_cJSON *status_object(bool setup_access, bool admin_access, bool remote_access)
 {
     monitor_network_snapshot net; monitor_network_snapshot_get(&net);
@@ -108,6 +124,8 @@ static cf_cJSON *status_object(bool setup_access, bool admin_access, bool remote
     b(j,"setup_access",setup_access);
     b(j,"admin_access",admin_access); b(j,"remote_access",remote_access);
     b(j,"clock_valid",time(NULL) > 1704067200); s(j,"internet","Not checked");
+    n(j,"utc_s",(int64_t)time(NULL)); n(j,"sntp_sync_count",net.sntp_sync_count);
+    n(j,"sntp_last_sync_utc",net.sntp_last_sync_utc);
     esp_cf_tunnel_snapshot connection; monitor_tunnel_snapshot(&connection);
     s(j,"tunnel_state",esp_cf_tunnel_state_name(connection.state));
     s(j,"tunnel_message",connection.message); s(j,"edge_ip",connection.edge_ip); s(j,"edge_location",connection.location);
@@ -118,6 +136,16 @@ static cf_cJSON *status_object(bool setup_access, bool admin_access, bool remote
     n(j,"tunnel_streams",connection.http2.active_streams); n(j,"tunnel_stack_min",connection.task_stack_min);
     s(j,"tunnel_last_failure",connection.last_failure); n(j,"tunnel_failures",connection.failures);
     n(j,"tunnel_last_failure_ms",connection.last_failure_ms); n(j,"tunnel_rejected_streams",connection.http2.rejected_streams);
+    connect_status(j,"tunnel_connect",&connection.last_connect);
+    connect_status(j,"tunnel_connect_failure",&connection.last_connect_failure);
+    monitor_ota_status update; monitor_ota_snapshot(&update);
+    cf_cJSON *ota=cf_cJSON_AddObjectToObject(j,"ota");
+    if(!ota) json_ok=false;
+    else {
+        b(ota,"available",update.available); b(ota,"active",update.active); b(ota,"ready",update.ready);
+        n(ota,"received",update.received); n(ota,"total",update.total); n(ota,"capacity",update.capacity);
+        s(ota,"running",update.running); s(ota,"target",update.target); s(ota,"version",update.version); s(ota,"message",update.message);
+    }
     b(j,"token_stored",tunnel->token[0] != 0); s(j,"hostname",tunnel->hostname);
     cf_secure_zero(tunnel,sizeof(*tunnel)); free(tunnel);
     cf_cJSON *gp = cf_cJSON_AddArrayToObject(j,"gpio"); if (!gp) json_ok = false;
@@ -237,6 +265,39 @@ static esp_err_t gpio_post(api_context *r, cf_cJSON *j)
     return ok(r);
 }
 
+static esp_err_t ota_post(api_context *r, cf_cJSON *j)
+{
+    bool success=false; char upload_id[33]={0}; bool started=false;
+    if(!strcmp(r->uri,"/api/ota/start")) {
+        const char *keys[]={"size","sha256"}; const cf_cJSON *size=cf_cJSON_GetObjectItemCaseSensitive(j,"size");
+        if(!cf_json_keys(j,keys,2) || !cf_cJSON_IsNumber(size) || size->valuedouble!=size->valueint || size->valueint<=0)
+            return error(r,"400 Bad Request","Provide the firmware size and SHA256 digest.");
+        success=monitor_ota_start((size_t)size->valueint,string(j,"sha256"),upload_id); started=success;
+    } else if(!strcmp(r->uri,"/api/ota/chunk")) {
+        const char *keys[]={"id","offset","data"}; const cf_cJSON *offset=cf_cJSON_GetObjectItemCaseSensitive(j,"offset");
+        const char *data=string(j,"data"); uint8_t bytes[MONITOR_OTA_CHUNK]; size_t size=0;
+        if(!cf_json_keys(j,keys,3) || !cf_cJSON_IsNumber(offset) || offset->valuedouble!=offset->valueint || offset->valueint<0 ||
+           !data || strlen(data)>((MONITOR_OTA_CHUNK+2)/3)*4 ||
+           mbedtls_base64_decode(bytes,sizeof(bytes),&size,(const unsigned char *)data,strlen(data))!=0)
+            return error(r,"400 Bad Request","Invalid upload chunk.");
+        success=monitor_ota_write(string(j,"id"),(size_t)offset->valueint,bytes,size);
+        cf_secure_zero(bytes,sizeof(bytes));
+    } else {
+        const char *keys[]={"id"};
+        if(!cf_json_keys(j,keys,1)) return error(r,"400 Bad Request","Provide an upload session id.");
+        if(!strcmp(r->uri,"/api/ota/finish")) {
+            success=monitor_ota_finish(string(j,"id"));
+            if(success) r->reply->effects|=MONITOR_EFFECT_REBOOT;
+        } else if(!strcmp(r->uri,"/api/ota/abort")) success=monitor_ota_abort(string(j,"id"));
+        else return error(r,"404 Not Found","OTA operation not found.");
+    }
+    monitor_ota_status state; monitor_ota_snapshot(&state);
+    if(!success) return error(r,"400 Bad Request",state.message);
+    cf_cJSON *reply=cf_cJSON_CreateObject(); json_ok=reply!=NULL;
+    b(reply,"ok",true); n(reply,"received",state.received); n(reply,"chunk_size",MONITOR_OTA_CHUNK);
+    if(started) s(reply,"id",upload_id);
+    cf_secure_zero(upload_id,sizeof(upload_id)); return send_json(r,reply);
+}
 static esp_err_t change_post(api_context *r)
 {
     if (!authorized(r)) return error(r,"401 Unauthorized","Unlock Settings with the device password. Sessions expire after 10 minutes.");
@@ -245,6 +306,10 @@ static esp_err_t change_post(api_context *r)
     esp_err_t rc;
     if (!strcmp(r->uri,"/api/wifi")) rc = wifi_post(r,j);
     else if (!strcmp(r->uri,"/api/tunnel")) rc = tunnel_post(r,j);
+    else if (!strncmp(r->uri,"/api/ota/",9)) rc = ota_post(r,j);
+    else if (!strcmp(r->uri,"/api/tunnel/restart") && cf_json_keys(j,NULL,0)) {
+        r->reply->effects |= MONITOR_EFFECT_TUNNEL_RESTART; rc=ok(r);
+    }
     else if (!strcmp(r->uri,"/api/gpio")) rc = gpio_post(r,j);
     else if (!strcmp(r->uri,"/api/rgb")) {
         const char *keys[]={"on","red","green","blue","brightness"};
@@ -306,8 +371,12 @@ void monitor_api_tick(void)
 {
     if(!monitor_json_lock || xSemaphoreTake(monitor_json_lock,0)!=pdTRUE) return;
     unsigned effects=0;
+    monitor_ota_tick();
+    monitor_tunnel_tick();
     if(pending_effects && milliseconds()>=effects_after) { effects=pending_effects; pending_effects=0; }
     xSemaphoreGive(monitor_json_lock);
     if(effects & MONITOR_EFFECT_WIFI) monitor_network_reload();
     if(effects & MONITOR_EFFECT_TUNNEL) monitor_tunnel_reload();
+    if(effects & MONITOR_EFFECT_TUNNEL_RESTART) monitor_tunnel_restart();
+    if(effects & MONITOR_EFFECT_REBOOT) esp_restart();
 }

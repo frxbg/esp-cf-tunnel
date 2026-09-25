@@ -24,6 +24,7 @@ typedef struct {
     bool head, api, complete;
 } response;
 static esp_cf_tunnel *tunnel;
+static bool restarting;
 static response responses[CF_H2_APPLICATION_MAX];
 
 static response *find(int32_t id)
@@ -154,6 +155,14 @@ esp_err_t monitor_tunnel_start(void)
     return rc==ESP_OK ? esp_cf_tunnel_start(tunnel) : rc;
 }
 void monitor_tunnel_reload(void) { if(tunnel) esp_cf_tunnel_reload(tunnel); }
+void monitor_tunnel_restart(void) { if(tunnel) { esp_cf_tunnel_stop(tunnel); restarting=true; } }
+void monitor_tunnel_tick(void)
+{
+    if(!restarting || !tunnel || esp_cf_tunnel_deinit(tunnel)!=ESP_OK) return;
+    tunnel=NULL; restarting=false;
+    /* Main task only; the old owner has exited before a new task is created. */
+    (void)monitor_tunnel_start();
+}
 void monitor_tunnel_snapshot(esp_cf_tunnel_snapshot *out)
 {
     memset(out,0,sizeof(*out));out->config_version=-1;

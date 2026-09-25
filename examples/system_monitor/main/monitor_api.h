@@ -5,6 +5,8 @@
 #define MONITOR_REPLY_MAX 6144u
 #define MONITOR_EFFECT_WIFI 1u
 #define MONITOR_EFFECT_TUNNEL 2u
+#define MONITOR_EFFECT_REBOOT 4u
+#define MONITOR_EFFECT_TUNNEL_RESTART 8u
 typedef struct {
     const char *path, *authorization;
     cf_bytes body;

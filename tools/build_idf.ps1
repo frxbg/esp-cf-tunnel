@@ -1,7 +1,8 @@
 param(
     [ValidateSet('esp32s3','esp32p4')][string]$Target = 'esp32s3',
     [ValidateSet('no_psram','psram')][string]$Profile = 'no_psram',
-    [switch]$TwoStreams
+    [switch]$TwoStreams,
+    [string]$TlsOverride = ''
 )
 $ErrorActionPreference = 'Stop'
 $env:PYTHONUTF8 = '1'
@@ -13,11 +14,16 @@ $buildDir = Join-Path $projectRoot "build-idf-$Target-$Profile$suffix"
 $defaults = @((Join-Path $exampleDir 'sdkconfig.defaults'), (Join-Path $exampleDir "profiles/$Profile.defaults"))
 if ($TwoStreams) { $defaults += Join-Path $exampleDir 'profiles/two_streams.defaults' }
 $sdkFile = Join-Path $buildDir 'sdkconfig'
+if ($TlsOverride) {
+    & python (Join-Path $PSScriptRoot 'prepare_idf_tls.py') --output $TlsOverride --check
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    $TlsOverride = (Resolve-Path -LiteralPath $TlsOverride).Path
+}
 # Each target/profile owns its build tree; no set-target deletion or COM defaults.
 # Windows PowerShell 5.1 wraps redirected native stderr as ErrorRecord even
 # when IDF only prints progress. Use the process exit code as the result.
 $ErrorActionPreference = 'Continue'
 & python (Join-Path $env:IDF_PATH 'tools/idf.py') -C $exampleDir -B $buildDir `
     '-D' "IDF_TARGET=$Target" '-D' "SDKCONFIG=$sdkFile" `
-    '-D' "SDKCONFIG_DEFAULTS=$($defaults -join ';')" build
+    '-D' "SDKCONFIG_DEFAULTS=$($defaults -join ';')" '-D' "CF_IDF_TLS_OVERRIDE=$TlsOverride" build
 exit $LASTEXITCODE

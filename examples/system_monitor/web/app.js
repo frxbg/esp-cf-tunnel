@@ -4,6 +4,7 @@ let latest = null, session = '', sessionUntil = 0, fetching = false, scanTimer =
 let wifiEdited = false, tunnelEdited = false, rgbEdited = false, noticeTimer = 0;
 const samples = [];
 let scannedNetworks = [];
+let otaBusy = false, otaCancel = false, otaRebooting = false;
 const pages = {
   overview: ['Overview', 'Live device health and connection status.'],
   io: ['Inputs / Outputs', 'Read pin levels and configure a small set of safe GPIOs.'],
@@ -42,6 +43,8 @@ function updateAccess() {
   const unlocked = activeSession();
   $('wifi-fields').disabled = !unlocked; $('tunnel-fields').disabled = !unlocked;
   $('rgb-fields').disabled = !unlocked || !latest?.rgb?.available;
+  $('ota-fields').disabled = !unlocked || otaBusy || otaRebooting || !latest?.ota?.available || latest.ota.active || latest.ota.ready;
+  $('restart-tunnel').disabled = !unlocked || otaBusy || otaRebooting;
   $('login-form').hidden = unlocked; $('logout').hidden = !unlocked;
   $('lock-state').textContent = unlocked ? 'Unlocked · 10 minute session' : 'Locked';
   $('lock-state').className = `badge ${unlocked ? '' : 'neutral'}`;
@@ -73,10 +76,16 @@ function render(s) {
   $('wifi-detail').textContent = $('local-state').textContent;
   $('flash').textContent = mib(s.flash_bytes); $('psram').textContent = s.psram_total ? `${mib(s.psram_free)} / ${mib(s.psram_total)}` : 'Not enabled';
   $('cpu').textContent = `${s.cores} cores · ${s.cpu_mhz} MHz`; $('device-ip').textContent = s.ip || (s.ap_enabled ? s.ap_ip : '—');
-  $('access-label').textContent = s.setup_access ? 'Setup Wi-Fi · local access' : s.admin_access ? 'Local network · password protected' : 'Cloudflare Tunnel · read only';
+  $('access-label').textContent = s.remote_access ? 'Cloudflare Tunnel · password protected' : s.setup_access ? 'Setup Wi-Fi · local access' : 'Local network · password protected';
   $('channel').textContent = s.wifi_associated ? s.channel : '—';
   $('disconnect').textContent = s.disconnect_reason ? `Wi-Fi reason ${s.disconnect_reason}` : 'None';
-  $('clock').textContent = s.clock_valid ? 'Valid time available' : 'Waiting for network time';
+  $('clock').textContent = s.sntp_sync_count ? `${new Date(s.utc_s * 1000).toISOString()} · SNTP syncs: ${s.sntp_sync_count}` : 'Waiting for SNTP confirmation';
+  for (const [id, record] of [['connect-diagnostic',s.tunnel_connect],['connect-failure',s.tunnel_connect_failure]])
+    $(id).textContent = record?.valid ? JSON.stringify(record,null,2) : 'No result recorded.';
+  const ota = s.ota;
+  $('ota-state').textContent = ota?.active ? 'Uploading' : ota?.ready ? 'Restart pending' : ota?.available ? 'Available' : 'USB setup required';
+  $('ota-slot').textContent = ota ? `Running: ${ota.running} · Maximum image: ${mib(ota.capacity)}` : '';
+  if (!otaBusy && !otaRebooting) $('ota-status').textContent = ota?.message || 'OTA status unavailable.';
   $('token-detail').textContent = s.token_stored ? 'Stored on device' : 'Not configured';
   const online = s.tunnel_state === 'Online';
   for (const id of ['tunnel-state','tunnel-detail-state']) { $(id).textContent = s.tunnel_state || 'Waiting'; $(id).className = `badge ${online ? '' : 'neutral'}`; }
@@ -149,12 +158,16 @@ async function refresh() {
   if (fetching) return; fetching = true;
   try {
     const s = await api('/api/status');
-    if (latest && s.uptime_ms < latest.uptime_ms) { samples.length = 0; lock(); }
+    if (latest && s.uptime_ms < latest.uptime_ms) {
+      samples.length = 0; lock();
+      if (otaRebooting) { location.reload(); return; }
+    }
     latest = s; samples.push({ram:s.heap_free}); if (samples.length > 60) samples.shift(); render(s);
     $('last-check').textContent = `Checked ${new Date().toLocaleTimeString('en-GB')}`;
     if ($('notice').dataset.offline) { $('notice').hidden=true; delete $('notice').dataset.offline; }
   } catch (_) {
     $('last-check').textContent = 'Device unreachable';
+    if (otaRebooting) return;
     notice('The device is unreachable. Measurements are paused and may be out of date. Check your Wi-Fi connection, then refresh.', 'error', true); $('notice').dataset.offline='1';
   } finally { fetching = false; }
 }
@@ -225,6 +238,49 @@ $('networks').addEventListener('change', () => {
   $('scan-status').textContent=`Selected ${network.ssid}. ${network.secure ? 'Enter the Wi-Fi password if needed, then' : 'This is an open network;'} select Save and connect.`;
 });
 $('refresh').addEventListener('click', refresh);
+$('restart-tunnel').addEventListener('click', () => action($('restart-tunnel'), async () => {
+  await api('/api/tunnel/restart',{}); notice('Tunnel restart scheduled. Remote access will reconnect shortly.');
+}));
+$('ota-cancel').addEventListener('click', () => { otaCancel = true; $('ota-cancel').disabled = true; });
+$('ota-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  if (otaBusy || !activeSession()) return;
+  const file = $('ota-file').files[0];
+  if (!file || !file.name.toLowerCase().endsWith('.bin') || file.size > (latest?.ota?.capacity || 0)) {
+    notice('Choose an application .bin that fits the inactive OTA slot.', 'error'); return;
+  }
+  otaBusy = true; otaCancel = false; updateAccess();
+  $('ota-progress').hidden = false; $('ota-progress').value = 0;
+  $('ota-cancel').hidden = false; $('ota-cancel').disabled = false;
+  let id = '';
+  try {
+    $('ota-status').textContent = 'Checking firmware SHA256…';
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const sha256 = sha256Bytes(bytes);
+    if (otaCancel) throw new Error('Upload cancelled.');
+    const start = await api('/api/ota/start',{size:bytes.length,sha256}); id = start.id;
+    for (let offset = 0; offset < bytes.length;) {
+      if (otaCancel) throw new Error('Upload cancelled.');
+      const chunk = bytes.subarray(offset,offset + start.chunk_size);
+      const result = await api('/api/ota/chunk',{id,offset,data:btoa(String.fromCharCode(...chunk))});
+      if (result.received !== offset + chunk.length) throw new Error('Unexpected upload offset. Start a new upload.');
+      offset = result.received;
+      const percent = Math.floor(offset * 100 / bytes.length);
+      $('ota-progress').value = percent; $('ota-status').textContent = `Uploading firmware: ${percent}% (${kib(offset)} / ${kib(bytes.length)})`;
+    }
+    if (otaCancel) throw new Error('Upload cancelled.');
+    $('ota-cancel').disabled = true; $('ota-status').textContent = 'Verifying firmware…';
+    await api('/api/ota/finish',{id}); id = ''; otaRebooting = true;
+    $('ota-status').textContent = 'Firmware verified. Waiting for restart…';
+    notice('Update accepted. The device will restart; this page will reload when it returns.', 'success', true);
+  } catch (err) {
+    if (id) { try { await api('/api/ota/abort',{id}); } catch (_) { /* Inactive upload expires automatically. */ } }
+    $('ota-status').textContent = err.message;
+    notice(`${err.message} Check device status before starting another update.`, 'error', true);
+  } finally {
+    otaBusy = false; $('ota-cancel').hidden = true; updateAccess();
+  }
+});
 window.addEventListener('hashchange', navigate); window.addEventListener('resize', drawChart);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
 navigate(); refresh(); setInterval(() => { updateAccess(); if (!document.hidden) refresh(); },2000);

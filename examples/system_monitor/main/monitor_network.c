@@ -24,6 +24,13 @@ static esp_netif_t *ap_netif, *sta_netif;
 
 static uint64_t now_ms(void) { return (uint64_t)esp_timer_get_time() / 1000; }
 
+static void clock_synced(struct timeval *tv)
+{
+    portENTER_CRITICAL(&mux);
+    ++state.sntp_sync_count; state.sntp_last_sync_utc = tv->tv_sec;
+    portEXIT_CRITICAL(&mux);
+}
+
 static void wifi_event(void *arg, esp_event_base_t base, int32_t id, void *data)
 {
     (void)arg;
@@ -170,6 +177,7 @@ esp_err_t monitor_network_start(void)
         return rc;
     esp_sntp_config_t sntp = ESP_NETIF_SNTP_DEFAULT_CONFIG("pool.ntp.org");
     sntp.start = false;
+    sntp.sync_cb = clock_synced;
     ESP_ERROR_CHECK(esp_netif_sntp_init(&sntp));
     gpio_config_t button = {.pin_bit_mask = 1ULL << 0, .mode = GPIO_MODE_INPUT, .pull_up_en = GPIO_PULLUP_ENABLE, .pull_down_en = GPIO_PULLDOWN_DISABLE, .intr_type = GPIO_INTR_DISABLE};
     ESP_ERROR_CHECK(gpio_config(&button));

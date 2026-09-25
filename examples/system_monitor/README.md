@@ -8,7 +8,8 @@ native tunnel; local HTTPD and remote requests use the same authenticated API.
 From the repository root, in an activated ESP-IDF v6.1 environment:
 
 ```sh
-python tools/build_monitor.py --profile yd_s3
+python tools/prepare_idf_tls.py --output .cache/idf-v6.1-tls/esp-tls
+python tools/build_monitor.py --profile yd_s3 --tls-override .cache/idf-v6.1-tls/esp-tls
 ```
 
 Use `--profile no_psram` for the compile profile without external RAM. The example

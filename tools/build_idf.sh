@@ -8,6 +8,12 @@ case "$profile" in no_psram|psram) ;; *) echo 'Profile must be no_psram or psram
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 example="$root/examples/protocol_smoke"
 build="$root/build-idf-$target-$profile"
+override=${3:-}
+if [ -n "$override" ]; then
+    python "$root/tools/prepare_idf_tls.py" --output "$override" --check
+    override=$(CDPATH= cd -- "$override" && pwd)
+fi
 python "$IDF_PATH/tools/idf.py" -C "$example" -B "$build" \
     -D "IDF_TARGET=$target" -D "SDKCONFIG=$build/sdkconfig" \
+    -D "CF_IDF_TLS_OVERRIDE=$override" \
     -D "SDKCONFIG_DEFAULTS=$example/sdkconfig.defaults;$example/profiles/$profile.defaults" build

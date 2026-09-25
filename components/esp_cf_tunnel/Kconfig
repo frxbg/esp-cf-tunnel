@@ -7,10 +7,13 @@ menu "Cloudflare Tunnel experimental profiles"
     config CF_TUNNEL_ESP_TRANSPORT
         bool "Build the experimental ESP-TLS named tunnel connector"
         select CF_TUNNEL_HTTP2
+        select MBEDTLS_SSL_PROTO_TLS1_3 if ESP_TLS_USING_MBEDTLS
         default n
         help
             IPv4 DNS discovery, TLS client, HTTP/2 server, registration and
             configuration. Application owns network/time and native backend.
+            TLS 1.3 is required by current edge endpoints. TLS certificate and
+            hostname verification remain enabled.
     config CF_TUNNEL_APPLICATION_STREAMS
         int "Example application stream slots (2 or 4)"
         range 2 4

@@ -1,0 +1,10 @@
+{
+  "patch_version": 1,
+  "idf_version": "v6.1",
+  "idf_commit": "fff9895c82d744c7237be8847347bdd1b07c6643",
+  "lwip_commit": "c6f2f878e7b0f86033214b85547d579be43351e3",
+  "source": "components/esp-tls/esp_tls.c",
+  "original_sha256": "ee7ddb63bb9328bb9aa44f8889081c0e5316f593c2466cb6da441f30b8989c48",
+  "patched_sha256": "39c8e10d6c7bb2caf94cf1c0f60624acbf0d15a4cee12dd62a4b48b587c688b2",
+  "patch_sha256": "8449a375a60bc54627a8ca8e5f060a0caa8ad0521b399ce4b33a9d93781dc9bb"
+}

@@ -5,7 +5,7 @@ if(CONFIG_CF_TUNNEL_HTTP2)
 endif()
 set(CF_PLATFORM_EMBED)
 if(CONFIG_CF_TUNNEL_ESP_TRANSPORT)
-    list(APPEND CF_CORE_SOURCES src/transport/esp_cf_tunnel.c)
+    list(APPEND CF_CORE_SOURCES src/transport/esp_cf_tunnel.c src/transport/cf_tls_diag.c)
     set(CF_PLATFORM_EMBED certs/cloudflare_edge_roots.pem)
 endif()
 idf_component_register(

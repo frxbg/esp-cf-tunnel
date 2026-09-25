@@ -11,6 +11,7 @@ python tools/generate_fixtures.py --check
 cmake -S . -B build-host
 cmake --build build-host --config Debug
 ctest --test-dir build-host -C Debug --output-on-failure
+node tests/host/test_sha256.js
 python tools/check_publication.py
 ```
 
@@ -21,16 +22,20 @@ provides `cf_parser_fuzz`; run it against a temporary corpus with a time limit.
 After activating ESP-IDF v6.1, compile both targets and memory profiles:
 
 ```sh
-sh tools/build_idf.sh esp32s3 no_psram
-sh tools/build_idf.sh esp32s3 psram
-sh tools/build_idf.sh esp32p4 no_psram
-sh tools/build_idf.sh esp32p4 psram
-python tools/build_monitor.py --profile yd_s3
-python tools/build_monitor.py --profile no_psram
+python tools/prepare_idf_tls.py --output .cache/idf-v6.1-tls/esp-tls
+python tools/test_idf_tls.py
+sh tools/build_idf.sh esp32s3 no_psram .cache/idf-v6.1-tls/esp-tls
+sh tools/build_idf.sh esp32s3 psram .cache/idf-v6.1-tls/esp-tls
+sh tools/build_idf.sh esp32p4 no_psram .cache/idf-v6.1-tls/esp-tls
+sh tools/build_idf.sh esp32p4 psram .cache/idf-v6.1-tls/esp-tls
+python tools/build_monitor.py --profile yd_s3 --tls-override .cache/idf-v6.1-tls/esp-tls
+python tools/build_monitor.py --profile no_psram --tls-override .cache/idf-v6.1-tls/esp-tls
 ```
 
 PowerShell users can use `tools/build_idf.ps1 -Target esp32s3 -Profile no_psram`
-with the corresponding target/profile combinations. Build commands never flash.
+with `-TlsOverride .cache/idf-v6.1-tls/esp-tls` and the corresponding target/profile
+combinations. Build commands never flash. The [patch guide](patches/esp-idf-v6.1/README.md)
+explains exact revision/hash guards and checks; the global SDK is never modified.
 
 The [independent RPC oracle](tools/rpc_reference/README.md) needs Go and the
 pinned reference checkout; ordinary C tests need neither. Update dependency

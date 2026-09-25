@@ -6,6 +6,23 @@
 #include "esp_err.h"
 
 typedef struct esp_cf_tunnel esp_cf_tunnel;
+typedef enum {
+    ESP_CF_CONNECT_UNKNOWN, ESP_CF_CONNECT_TCP, ESP_CF_CONNECT_TLS_SETUP,
+    ESP_CF_CONNECT_TLS_HANDSHAKE, ESP_CF_CONNECT_DEADLINE, ESP_CF_CONNECT_VERIFIED
+} esp_cf_connect_stage;
+typedef struct {
+    bool valid, errors_available;
+    esp_cf_connect_stage stage;
+    int rc, state_before, state_after;
+    int esp_error, tls_error, verify_flags, system_error;
+    int errno_context; /* Supplemental only: errno can be stale. */
+    int tls_alert, tls_version; /* Public mbedTLS getters; -1 if unavailable. */
+    uint64_t elapsed_ms, at_ms;
+    int64_t utc_s; /* Observed system clock, not proof of clock accuracy. */
+    uint32_t attempt, heap_free, heap_largest;
+    char edge_ip[16];
+    uint16_t edge_port;
+} esp_cf_connect_diagnostic;
 typedef struct {
     bool network_ready, time_valid;
     uint8_t local_ip[4], dns_ip[4];
@@ -39,6 +56,7 @@ typedef struct {
     uint32_t failures;
     cf_h2_stats http2;
     uint32_t task_stack_min;
+    esp_cf_connect_diagnostic last_connect, last_connect_failure;
 } esp_cf_tunnel_snapshot;
 
 /* Application owns networking, clock, credential persistence and callbacks.
@@ -52,4 +70,5 @@ void esp_cf_tunnel_stop(esp_cf_tunnel *tunnel);
 esp_err_t esp_cf_tunnel_deinit(esp_cf_tunnel *tunnel); /* INVALID_STATE until stopped. */
 void esp_cf_tunnel_get_snapshot(esp_cf_tunnel *tunnel, esp_cf_tunnel_snapshot *out);
 const char *esp_cf_tunnel_state_name(cf_state state);
+const char *esp_cf_connect_stage_name(esp_cf_connect_stage stage);
 #endif

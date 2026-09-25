@@ -6,6 +6,7 @@ source, target = map(Path, sys.argv[1:])
 assets = [("index.html", "/", "text/html; charset=utf-8"),
           ("style.css", "/style.css", "text/css; charset=utf-8"),
           ("app.js", "/app.js", "text/javascript; charset=utf-8"),
+          ("sha256.js", "/sha256.js", "text/javascript; charset=utf-8"),
           ("favicon.svg", "/favicon.svg", "image/svg+xml")]
 lines = ['#include "monitor.h"']
 entries = []

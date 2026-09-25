@@ -1,5 +1,12 @@
 # Validation
 
+## Unreleased TCP/TLS and OTA follow-up
+
+The 2026-09-25 diagnostics, versioned SDK patch, TLS 1.3 device evidence,
+OTA checks and 12 measured task restart cycles are documented in
+[tcp-tls-diagnostics.md](tcp-tls-diagnostics.md). These are unreleased development
+changes; the release evidence below remains the separate 0.3.2 baseline.
+
 ## Library baseline: 0.3.2
 
 Verified during development on 2026-09-22. Hardware, compile-only and host

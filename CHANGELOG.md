@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- Retain structured TCP/TLS diagnostics, including system errors, peer alerts,
+  elapsed time and heap measurements, before destroying the connection handle.
+- Add a guarded, explicit ESP-IDF v6.1 SDK poll patch and regression harness.
+- Enable verified TLS 1.3 for the native connector after measured edge rejection
+  of TLS 1.2; preserve SNI, CA validation and bounded 1 ms polling.
+- Add authenticated, bounded OTA uploads to the English System Monitor UI
+  (0.4.0-dev), with inactive slots, integrity/image checks and startup rollback.
+- Show actual SNTP confirmations and offer authenticated tunnel restart.
+
 ## 0.3.2 - 2026-09-22
 
 Initial public ESP-IDF library distribution.

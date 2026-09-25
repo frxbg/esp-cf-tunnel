@@ -31,6 +31,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - run: python3 tools/check_publication.py
       - run: python3 tools/generate_fixtures.py --check
+      - run: node tests/host/test_sha256.js
       - run: cmake -S . -B build-host -DCMAKE_C_COMPILER=clang -DCF_SANITIZERS=ON -DCF_FUZZING=ON
       - run: cmake --build build-host --parallel 2
       - run: ctest --test-dir build-host --output-on-failure
@@ -50,7 +51,9 @@ jobs:
         run: |
           . "$IDF_PATH/export.sh"
           test "$(git -C "$IDF_PATH" rev-parse HEAD)" = fff9895c82d744c7237be8847347bdd1b07c6643
-          sh tools/build_idf.sh '${{ matrix.target }}' '${{ matrix.profile }}'
+          python tools/prepare_idf_tls.py --output .cache/idf-v6.1-tls/esp-tls
+          python tools/test_idf_tls.py
+          sh tools/build_idf.sh '${{ matrix.target }}' '${{ matrix.profile }}' .cache/idf-v6.1-tls/esp-tls
   monitor:
     runs-on: ubuntu-24.04
     container: espressif/idf:v6.1
@@ -63,4 +66,5 @@ jobs:
       - shell: bash
         run: |
           . "$IDF_PATH/export.sh"
-          python tools/build_monitor.py --profile '${{ matrix.profile }}'
+          python tools/prepare_idf_tls.py --output .cache/idf-v6.1-tls/esp-tls
+          python tools/build_monitor.py --profile '${{ matrix.profile }}' --tls-override .cache/idf-v6.1-tls/esp-tls

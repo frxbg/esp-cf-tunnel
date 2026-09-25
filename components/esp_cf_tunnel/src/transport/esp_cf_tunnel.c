@@ -6,6 +6,8 @@
 #include "esp_timer.h"
 #include "esp_random.h"
 #include "esp_log.h"
+#include "esp_heap_caps.h"
+#include "cf_tls_diag.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "lwip/sockets.h"
@@ -16,6 +18,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <time.h>
 
 extern const unsigned char cf_edge_ca_start[] asm("_binary_cloudflare_edge_roots_pem_start");
 extern const unsigned char cf_edge_ca_end[] asm("_binary_cloudflare_edge_roots_pem_end");
@@ -39,6 +42,8 @@ struct esp_cf_tunnel {
     char last_failure[128];
     uint64_t last_failure_ms;
     uint32_t failures;
+    esp_cf_connect_diagnostic last_connect, last_connect_failure;
+    uint64_t connect_started_ms;
     esp_cf_environment environment;
     cf_dns_answer *dns_answer;
     uint8_t dns_packet[CF_DNS_PACKET_MAX];
@@ -79,6 +84,7 @@ static void publish(esp_cf_tunnel *t)
     snprintf(next.message, sizeof(next.message), "%s", t->message);
     snprintf(next.last_failure, sizeof(next.last_failure), "%s", t->last_failure);
     next.last_failure_ms = t->last_failure_ms; next.failures = t->failures;
+    next.last_connect = t->last_connect; next.last_connect_failure = t->last_connect_failure;
     if (t->h2) cf_h2_get_stats(t->h2, &next.http2);
     next.task_stack_min = (uint32_t)uxTaskGetStackHighWaterMark(NULL);
     portENTER_CRITICAL(&t->lock);
@@ -111,15 +117,19 @@ static void retry(esp_cf_tunnel *t, const char *why)
     bool permanent = t->rpc.state == CF_RPC_REJECTED && !t->rpc.should_retry;
     uint64_t hint = t->rpc.state == CF_RPC_REJECTED ? t->rpc.retry_after_ms : 0;
     message(t, why);
-    cf_h2_stats stats = {0};
-    if (t->h2) cf_h2_get_stats(t->h2, &stats);
-    snprintf(t->last_failure, sizeof(t->last_failure), "%.60s [h2=%ld, goaway=%s:%lu, peer=%lu/%ld]",
-        why, (long)stats.last_error, !stats.goaway ? "none" : stats.local_goaway ? "local" : "peer", (unsigned long)stats.goaway_error,
-        (unsigned long)stats.peer_goaway_error, (long)stats.peer_goaway_last_stream);
+    if (t->h2) {
+        cf_h2_stats stats; cf_h2_get_stats(t->h2, &stats);
+        snprintf(t->last_failure, sizeof(t->last_failure), "%.60s [h2=%ld, goaway=%s:%lu, peer=%lu/%ld]",
+            why, (long)stats.last_error, !stats.goaway ? "none" : stats.local_goaway ? "local" : "peer", (unsigned long)stats.goaway_error,
+            (unsigned long)stats.peer_goaway_error, (long)stats.peer_goaway_last_stream);
+        ESP_LOGW("cf_tunnel", "%s; streams=%lu rejected=%lu ngheap=%u/%u", t->last_failure,
+            (unsigned long)stats.active_streams, (unsigned long)stats.rejected_streams,
+            (unsigned)stats.ngheap_current, (unsigned)stats.ngheap_peak);
+    } else {
+        snprintf(t->last_failure, sizeof(t->last_failure), "%s", why);
+        ESP_LOGW("cf_tunnel", "%s", t->last_failure);
+    }
     t->last_failure_ms = now_ms(); ++t->failures;
-    ESP_LOGW("cf_tunnel", "%s; streams=%lu rejected=%lu ngheap=%u/%u", t->last_failure,
-        (unsigned long)stats.active_streams, (unsigned long)stats.rejected_streams,
-        (unsigned)stats.ngheap_current, (unsigned)stats.ngheap_peak);
     if (permanent) (void)cf_lifecycle_advance(&t->life, CF_EVENT_AUTH_REJECTED);
     else (void)cf_lifecycle_retry(&t->life, now_ms(), hint > UINT32_MAX ? UINT32_MAX : (uint32_t)hint, esp_random());
     close_connection(t);
@@ -269,6 +279,25 @@ static cf_result dns_send(esp_cf_tunnel *t, const char *name, cf_dns_type type)
     if (send(t->dns_socket, t->dns_packet, n, 0) != (int)n) return CF_ERR_STATE;
     t->deadline_ms = now_ms() + 5000; return CF_OK;
 }
+static void connect_diagnostic(esp_cf_tunnel *t, int rc, int saved_errno,
+                               int before, int after, bool deadline)
+{
+    esp_cf_connect_diagnostic *d = &t->last_connect;
+    cf_tls_diag_capture(d, t->tls, rc, saved_errno, before, after, deadline);
+    if (!t->tls) { d->stage = ESP_CF_CONNECT_TLS_SETUP; d->esp_error = ESP_ERR_NO_MEM; }
+    d->at_ms = now_ms(); d->elapsed_ms = d->at_ms - t->connect_started_ms;
+    d->utc_s = (int64_t)time(NULL); d->attempt = t->attempts;
+    d->heap_free = heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    d->heap_largest = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    snprintf(d->edge_ip, sizeof(d->edge_ip), "%s", t->edge_ip); d->edge_port = CF_EDGE_PORT;
+    if (d->stage != ESP_CF_CONNECT_VERIFIED) t->last_connect_failure = *d;
+    ESP_LOGI("cf_tunnel", "connect stage=%s rc=%d state=%d/%d errors=%d esp=0x%x tls=%d verify=0x%x system=%d errno_context=%d alert=%d version=0x%x",
+        esp_cf_connect_stage_name(d->stage), d->rc, d->state_before, d->state_after,
+        d->errors_available, d->esp_error, d->tls_error, d->verify_flags, d->system_error, d->errno_context, d->tls_alert, d->tls_version);
+    ESP_LOGI("cf_tunnel", "connect attempt=%lu elapsed_ms=%llu edge=%s:%u utc=%lld heap=%lu largest=%lu",
+        (unsigned long)d->attempt, (unsigned long long)d->elapsed_ms, d->edge_ip, d->edge_port,
+        (long long)d->utc_s, (unsigned long)d->heap_free, (unsigned long)d->heap_largest);
+}
 static bool discover(esp_cf_tunnel *t)
 {
     if (!t->attempt_started) {
@@ -317,8 +346,9 @@ static bool discover(esp_cf_tunnel *t)
     const uint8_t *ip = t->dns_answer->records[esp_random() % t->dns_answer->count].ip;
     snprintf(t->edge_ip, sizeof(t->edge_ip), "%u.%u.%u.%u", ip[0], ip[1], ip[2], ip[3]);
     close(t->dns_socket); t->dns_socket = -1; free(t->dns_answer); t->dns_answer = NULL;
+    t->connect_started_ms = now_ms();
     t->tls = esp_tls_init();
-    if (!t->tls) { message(t, "Not enough memory for TLS."); return false; }
+    if (!t->tls) { connect_diagnostic(t, -1, 0, -1, -1, false); message(t, "TLS context allocation failed."); return false; }
     t->tls_config = (esp_tls_cfg_t){.non_block = true, .timeout_ms = 1, .common_name = CF_EDGE_TLS_NAME,
         .cacert_buf = cf_edge_ca_start, .cacert_bytes = (unsigned int)(cf_edge_ca_end - cf_edge_ca_start)};
     t->deadline_ms = now_ms() + 30000;
@@ -327,12 +357,21 @@ static bool discover(esp_cf_tunnel *t)
 }
 static bool connect_tls(esp_cf_tunnel *t)
 {
+    esp_tls_conn_state_t before = ESP_TLS_INIT, state = ESP_TLS_INIT;
+    int before_code = esp_tls_get_conn_state(t->tls, &before) == ESP_OK ? (int)before : -1;
     int rc = esp_tls_conn_new_async(t->edge_ip, (int)strlen(t->edge_ip), CF_EDGE_PORT, &t->tls_config, t->tls);
-    esp_tls_conn_state_t state;
-    (void)esp_tls_get_conn_state(t->tls, &state);
+    int saved_errno = errno; /* Capture before any further API calls/logging. */
+    int after_code = esp_tls_get_conn_state(t->tls, &state) == ESP_OK ? (int)state : -1;
     if (t->life.state == CF_CONNECT && (state == ESP_TLS_HANDSHAKE || rc == 1)) (void)cf_lifecycle_advance(&t->life, CF_EVENT_CONNECTED);
-    if (rc < 0 || now_ms() >= t->deadline_ms) { message(t, "TLS connection failed. Check clock, CA trust, and outbound TCP 7844."); return false; }
+    bool deadline = now_ms() >= t->deadline_ms;
+    if (rc < 0 || (rc == 0 && deadline)) {
+        connect_diagnostic(t, rc, saved_errno, before_code, after_code, deadline);
+        snprintf(t->message, sizeof(t->message), "Connect failed at %s; see structured connect diagnostics.",
+            esp_cf_connect_stage_name(t->last_connect.stage));
+        return false;
+    }
     if (rc == 0) return true;
+    connect_diagnostic(t, rc, saved_errno, before_code, after_code, false);
     int fd, enabled = 1;
     if (esp_tls_get_conn_sockfd(t->tls, &fd) == ESP_OK) (void)setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &enabled, sizeof(enabled));
     cf_h2_callbacks callbacks = {t, h2_request, h2_data, h2_read, h2_closed, secure_random};

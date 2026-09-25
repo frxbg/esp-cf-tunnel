@@ -10,7 +10,7 @@
 #include "cf_credentials.h"
 #include "esp_cf_tunnel.h"
 
-#define MONITOR_VERSION "0.3.2"
+#define MONITOR_VERSION "0.4.0-dev"
 #define MONITOR_AP_IP "192.168.4.1"
 #define MONITOR_SETUP_SECONDS 600
 #define MONITOR_GPIO_COUNT 4
@@ -21,6 +21,8 @@ typedef struct {
     bool connected, connecting, associated, ap_enabled, scanning, scan_ready;
     unsigned retries, disconnect_reason, ap_clients;
     uint64_t ap_deadline_ms;
+    uint32_t sntp_sync_count;
+    int64_t sntp_last_sync_utc;
     char ip[16], gateway[16], ssid[33], ap_ssid[33];
     int rssi;
     unsigned channel;
@@ -57,6 +59,8 @@ esp_err_t monitor_http_start(void);
 extern SemaphoreHandle_t monitor_json_lock;
 esp_err_t monitor_tunnel_start(void);
 void monitor_tunnel_reload(void);
+void monitor_tunnel_restart(void);
+void monitor_tunnel_tick(void); /* Called under monitor_json_lock. */
 void monitor_tunnel_snapshot(esp_cf_tunnel_snapshot *out);
 
 typedef struct { const char *uri, *type; const uint8_t *data; size_t len; } monitor_asset;
